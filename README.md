@@ -53,7 +53,7 @@ wuenda | 123
 
 * 由于线上资源匮乏，也不想使系统增加复杂度，所以没有直接使用MQ组件，而是以数据库表作为代替。
 * recsys_model属于用notebook进行数据分析和数据处理以及建模的草稿，地址为：https://github.com/GavinHacker/recsys_model
-* 其余的所有项目的地址为：https://gitee.com/chengguowei
+* 其余的所有项目的地址索引为：https://github.com/GavinHacker/technologyx
 
 
 ## 模型相关的模块介绍
