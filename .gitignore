@@ -1,0 +1,22 @@
+target/
+logs/
+.settings/
+.project
+.mymetadata
+.classpath
+.externalToolBuilders/
+.DS_Store
+*.spec
+
+#IDEA
+# idea ignore
+.idea/
+.svn/
+build/
+dist/
+*.ipr
+*.iml
+*.iws
+*.log
+*.pyc
+
