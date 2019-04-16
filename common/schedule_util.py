@@ -20,7 +20,8 @@ def task():
 
 
 def schedule_(interval, task_func):
-    interval=10
+    if interval is None:
+        interval=10
     schedule.enter(0, 0, enter_, [interval, task_func])
     schedule.run()
 

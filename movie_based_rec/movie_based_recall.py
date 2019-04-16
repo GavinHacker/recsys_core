@@ -116,4 +116,4 @@ def func_main():
 
 
 if __name__ == '__main__':
-    sched_util.schedule_(60, func_main)
+    sched_util.schedule_(10*60*1000, func_main)

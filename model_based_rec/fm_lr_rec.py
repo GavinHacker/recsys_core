@@ -190,7 +190,13 @@ def update_fm_rat(df_data, libfm_predict_final):
     conn = common.get_connection()
     index_ = 0
     for r in libfm_predict_final:
-        update_recmovie_rat(df_data.iloc[index_]['id'], r, conn, 'FM')
+        r_temp = r
+        try:
+            r_temp = r[0:4]
+        except Exception as e:
+            print("Update FM rat exception")
+            print(e)
+        update_recmovie_rat(df_data.iloc[index_]['id'], r_temp, conn, 'FM')
         index_ += 1
 
 
@@ -256,4 +262,4 @@ def process_task():
 
 
 if __name__ == '__main__':
-    sched_util.schedule_(10, task_func=process_task)
+    sched_util.schedule_(10*60*1000, task_func=process_task)
