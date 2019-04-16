@@ -1,6 +1,4 @@
 
-> author NoOne
-
 ## 整体介绍
 
 * recsys_ui: 前端技术(html5+JavaScript+jquery+ajax)
