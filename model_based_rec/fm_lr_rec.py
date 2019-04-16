@@ -190,9 +190,9 @@ def update_fm_rat(df_data, libfm_predict_final):
     conn = common.get_connection()
     index_ = 0
     for r in libfm_predict_final:
-        r_temp = r
+        r_temp = str(r)
         try:
-            r_temp = r[0:4]
+            r_temp = str(r)[0:1]
         except Exception as e:
             print("Update FM rat exception")
             print(e)
