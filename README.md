@@ -24,7 +24,7 @@ wuenda | 123
 
 欢迎登录使用感受一下。
 
-![image](http://www.vmfor.com/img/recsys/%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D.png)
+![输入图片说明](https://gitee.com/uploads/images/2019/0505/141506_61adc584_1234921.jpeg "主页.jpg")
 
 
 ## 设计思路
@@ -65,7 +65,7 @@ wuenda | 123
 
  运行截图
 
-![image](http://www.vmfor.com/img/recsys/处理增量的comment.png)
+![输入图片说明](https://gitee.com/uploads/images/2019/0505/141303_0253c880_1234921.png "运行截图.png")
 
 消息队列的截图
 
