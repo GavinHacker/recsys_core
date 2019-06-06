@@ -68,7 +68,7 @@ wuenda | 123
 
  运行截图
 
-![输入图片说明](https://gitee.com/uploads/images/2019/0505/141303_0253c880_1234921.png "运行截图.png")
+![image](http://upload-images.jianshu.io/upload_images/2230072-db260d1cc802553d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 消息队列的截图
 
