@@ -28,8 +28,7 @@ wuenda | 123
 
 欢迎登录使用感受一下。
 
-![输入图片说明](https://gitee.com/uploads/images/2019/0505/141506_61adc584_1234921.jpeg "主页.jpg")
-
+![image](http://upload-images.jianshu.io/upload_images/2230072-7cdaee7ab618eda5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 ## 设计思路
 
