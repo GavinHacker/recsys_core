@@ -42,7 +42,7 @@ def get_dim_dict(df, dim_name):
     return type_dict
 
 
-# 获取必要的频率统计数据
+# 获取各个频率统计字典对象
 def get_typedict_actorsdict_directordict_traitdict():
     _, df = get_movie_data()
     type_dict = get_dim_dict(df, 'type')
@@ -82,7 +82,7 @@ def convert_to_dict_list(df_):
     return movie_dict_list
 
 
-# 分别获取相似矩阵, 字典2向量转换器, 矩阵向量
+# 分别获取相似矩阵, 字典 -> 向量 转换器, 矩阵向量
 def get_0similarity_matrix_1dict_vectorizer_2vector_matrix(movie_dict_list):
     v = DictVectorizer()
     X = v.fit_transform(movie_dict_list)
@@ -150,7 +150,7 @@ def insert_one_ibmovie(id_,
             pass
 
 
-# 处理推荐电影的数量
+# 根据某电影ID, 查询ibmovie表中,关于某电影已经存在的相似电影数量
 def get_recmovie_cnt_by_movieid(movieid, connection):
     sql = 'select count(*) from ibmovie group by movieid having movieid=\'%s\'' % movieid
     try:
@@ -170,11 +170,12 @@ def get_recmovie_cnt_by_movieid(movieid, connection):
         connection = common.get_connection()
 
 
-# 处理全量数据（初始化数据)入口函数
+# 处理全量数据（初始化数据)入口函数; 一般此函数应是初始化时执行,如果数据库中,ibmovie表已经是初始化好的,本函数不用二次执行
 def process_offline_compute_by_cosdis(rec_per_num, item_similarity, df_sim, df_orgin):
     rec_per_num += 1
     connection = common.get_connection()
     for i in range(0, item_similarity.shape[0]):
+        # 获取与i相似度rec_per_num个数量的电影, 并插入到ibmovie中
         df_sim_p = df_sim.nsmallest(rec_per_num, i)
         df_sim_p = df_sim_p[i]
         movie_id = df_orgin.iloc[i]['id']
@@ -196,6 +197,7 @@ def process_offline_compute_by_cosdis(rec_per_num, item_similarity, df_sim, df_o
         connection.commit()
 
 
+# 增量处理 当电影数据增加的时候 扫描mqlog表, 查询logtype为m的数据, 得到增量的电影, 然后调用处理函数（process_func）
 def process_by_movie_change_log(process_func, sim_matrix, df_origin):
     connection = common.get_connection()
     sql = 'select * from mqlog where logtype = \'m\' and pulled = 0 limit 0,10'
@@ -237,7 +239,7 @@ def get_min_sim_movie_by_movieid(movieid):
     connection.close()
 
 
-# 处理每一个增量的电影
+# 处理每一个增量的电影, 在相似度矩阵中查找到关于新电影 的相似电影集合, 插入到ibmoive中
 def process_per_movie(movieid, sim_matrix, df_origin, rec_per_num=201):
     df_sim_matrix = pd.DataFrame(data=sim_matrix)
     print(df_sim_matrix.shape)
@@ -278,12 +280,15 @@ def process_per_movie(movieid, sim_matrix, df_origin, rec_per_num=201):
                                            connection=connection)
 
 
+# 处理主函数
 def process_task():
     print('start process movie similarity task:'+str(datetime.datetime.now()))
     start_time = datetime.datetime.now()
     df_origin, df_simple = get_movie_data()
     movie_dict_list = convert_to_dict_list(df_simple)
+    # 得到相似度矩阵
     similarity_matrix, dict_vectorizer, vector_matrix = get_0similarity_matrix_1dict_vectorizer_2vector_matrix(movie_dict_list)
+    # 处理mqlog的消息日志, 如果出现新的电影, 则执行相似电影的计算插入到ibmoive表中
     process_by_movie_change_log(process_per_movie, similarity_matrix, df_origin)
     end_time = datetime.datetime.now()
     print(end_time - start_time)

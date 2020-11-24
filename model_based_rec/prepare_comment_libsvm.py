@@ -50,6 +50,7 @@ def load_main_df_from_csv():
     return df_main
 
 
+# 获取维度的频次类字典对象,如电影演员出现的频次
 def get_dim_dict(df, dim_name):
     type_list = list(map(lambda x: x.split('|'), df[dim_name]))
     type_list = [x for l in type_list for x in l]
@@ -71,7 +72,7 @@ def get_dim_dict(df, dim_name):
     return some_dict
 
 
-# type_dict, actors_dict, director_dict, trait_dict
+# 获取各个维度会使用到的,字典频次对象 type_dict, actors_dict, director_dict, trait_dict
 def get_dicts():
     conn = common.get_connection()
     df_movie = pd.read_sql_query("select * from movie", conn)
@@ -82,6 +83,7 @@ def get_dicts():
     return None, actors_dict, director_dict, None
 
 
+# 获取整个数据集的字典形式的数据结构（由DataFrame加工而来)
 def get_dict_list(df_main, actors_dict, director_dict):
     invalid_data_list = []
     data_dict_list = []
@@ -137,6 +139,7 @@ def get_dict_list(df_main, actors_dict, director_dict):
 csv_url_cache = None
 
 
+# 处理主函数
 def process_task():
     global csv_url_cache
     start_time = datetime.datetime.now()
@@ -149,9 +152,10 @@ def process_task():
     elif csv_url_cache == csv_url:
         print('there is no new comment csv...')
         return
-
+    # 从csv文件加载数据集
     data_frame_main = load_main_df_from_csv()
     conn = common.get_connection()
+    # 加载字典频次对象
     _, actors_dict_, director_dict_, _ = get_dicts()
     actors_dict_save_url = cfg.get_config_property('actors_dict', conn)
     director_dict_save_url = cfg.get_config_property('director_dict', conn)
@@ -162,8 +166,10 @@ def process_task():
 
     train_y = data_frame_main['RATING']
     data_frame_main = data_frame_main.drop(['RATING'], axis=1)
+    # 获取整体数据集的字典形式数据
     dict_data_list = get_dict_list(data_frame_main, actors_dict_, director_dict_)
 
+    # 把字典形式的数据做向量化
     v = DictVectorizer()
     train_X = v.fit_transform(dict_data_list)
 
@@ -174,9 +180,11 @@ def process_task():
 
     print(train_X_.shape)
 
+    # 对于逻辑回归的训练集和测试集数据处理, 评分大于3为用户喜爱电影
     train_y_lr_ = train_y_.apply(lambda x: 1 if int(x) > 3 else 0)
     test_y_lr_ = test_y_.apply(lambda x: 1 if int(x) > 3 else 0)
 
+    # 最大最小值归一化
     scaler = preprocessing.MaxAbsScaler()
     scaler.fit(train_X)
     train_X_scaling = scaler.transform(train_X_)
@@ -191,6 +199,7 @@ def process_task():
     train_file_fm = train_file_fm_base_url % time_now_str
     test_file_fm = test_file_fm_base_url % time_now_str
 
+    # 转换为libsvm格式数据
     dump_svmlight_file(train_X_scaling, train_y_, train_file_fm)
     dump_svmlight_file(test_X_scaling, test_y_, test_file_fm)
 
@@ -199,6 +208,7 @@ def process_task():
     train_file_lr = train_file_lr_base_url % time_now_str
     test_file_lr = test_file_lr_base_url % time_now_str
 
+    # 转换为libsvm格式数据
     dump_svmlight_file(train_X_lr, train_y_lr_, train_file_lr)
     dump_svmlight_file(test_X_lr, test_y_lr_, test_file_lr)
 

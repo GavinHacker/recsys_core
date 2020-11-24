@@ -22,6 +22,7 @@ np.set_printoptions(suppress=True)
 import common.schedule_util as sched_util
 
 
+# 获取新的电影评分数据,即用户对某个电影作出的新的评论打分
 def get_comment_data():
     conn = common.get_connection()
     df_comment_new_data = pd.read_sql_query("select * from comment_new where newdata = 1 ", conn)
@@ -29,6 +30,7 @@ def get_comment_data():
     return df_comment_new_data_ldim
 
 
+# 根据电影id, 到ibmovie表中, 获取所有与该电影相似的电影
 def get_ibmovie_by_movieid(movieid, connection):
     sql = 'select DISTINCT recmovieid from ibmovie where movieid = \'%s\'' % movieid
     try:
@@ -41,6 +43,7 @@ def get_ibmovie_by_movieid(movieid, connection):
     return None
 
 
+# 将推荐的电影插入或更新到recmovie表（当推荐的电影已经存在于recmovie, 执行更新, 如果不存在 则执行插入）
 def insert_or_update_recmovie(movieid, userid, srcmovieid, connection):
     _id = uuid.uuid4()
     time_now = datetime.datetime.now()
@@ -67,6 +70,7 @@ def insert_or_update_recmovie(movieid, userid, srcmovieid, connection):
     return None
 
 
+# 更新newdata字段, 即对于新的评分数据做已读处理,不会二次处理
 def update_comment_new_data_flag(rid, connection):
     sql = 'update comment_new set newdata = 0 where id = \'%s\'' % rid
     try:
@@ -77,6 +81,7 @@ def update_comment_new_data_flag(rid, connection):
         connection.close()
 
 
+# 判断某个用户是不是对于某个电影已经有了评分
 def exist_in_comment(movieid, userid, connection):
     sql = 'select id from comment_new where movieid = \'%s\' and userid = \'%s\'' % (movieid, userid)
     try:
@@ -90,18 +95,24 @@ def exist_in_comment(movieid, userid, connection):
     return False
 
 
+# 处理主函数
 def func_main():
     print('start process movie based recall task:'+str(datetime.datetime.now()))
     start_time = datetime.datetime.now()
 
     conn = common.get_connection()
+    # 获取增量的评论评分数据
     df_comment_new_data_ldim = get_comment_data()
     conn = common.get_connection()
+    # 遍历评分数据
     for i in df_comment_new_data_ldim.index:
         print(df_comment_new_data_ldim.iloc[i]['MOVIEID'], df_comment_new_data_ldim.iloc[i]['USERID'])
+        # 从相似推荐中找到相似的电影
         ibmovie_list = get_ibmovie_by_movieid(df_comment_new_data_ldim.iloc[i]['MOVIEID'], conn)
         for j in ibmovie_list:
             is_exist = exist_in_comment(j[0], df_comment_new_data_ldim.iloc[i]['USERID'], conn)
+            # 如果推荐的电影,该用户已经评分过（看过, 则不推荐
+            # 否则, 插入到recmove表中（recmove表的插入也有存在判断,如果存在,则更新）
             if is_exist:
                 print('exist in comment')
             else:

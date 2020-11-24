@@ -28,6 +28,7 @@ import common.common as common
 import common.schedule_util as sched_util
 
 
+# 使用命令行运行FM模型调用
 def run(cmd):
 
     conn = common.get_connection()
@@ -49,7 +50,7 @@ def run(cmd):
         if out_temp:
             out_temp.close()
 
-
+# FM模型使用函数, 输入训练集的file: train_file, 要预测的数据的file: test_file
 def fm(train_file, test_file, classification=True, rank=10, n_iter=150):
     conn = common.get_connection()
     libfm = cfg.get_config_property('lib_fm_path', conn)
@@ -65,6 +66,7 @@ def fm(train_file, test_file, classification=True, rank=10, n_iter=150):
     return libfm_predict
 
 
+# 测试FM
 def test_fm_by_test_data(train_file, test_file):
 
     conn = common.get_connection()
@@ -79,16 +81,18 @@ def test_fm_by_test_data(train_file, test_file):
     print('MSE(origin):' + str(mean_squared_error(y, libfm_predict_series.tolist())))
 
 
+# 从路径中获取libsvm数据, 返回X矩阵和 y矩阵
 def get_data(path):
     data = load_svmlight_file(path)
     return data[0], data[1]
 
 
+# 获取 由 相似度矩阵得来的 推荐电影集合
 def get_recmovie_by_movie_based():
     conn = common.get_connection()
     sql = 'select * from recmovie left join movie on movie.id=recmovie.movieid left join userproex_new on userproex_new.userid=recmovie.userid'
     df_data = pd.read_sql_query(sql, conn)
-    df_data = df_data.drop([0], axis=1)
+    #df_data = df_data.drop([0], axis=1)
     #df_data = df_data.rename(columns = {'userid':'USERID'})
     #df_data['USERID'].fillna(0)
     print(df_data.columns)
@@ -100,6 +104,7 @@ def get_recmovie_by_movie_based():
     return df_data
 
 
+# 获取保存的对象, 1 演员出现频次字典对象 2 导演出现频次字典对象 3 将训练数据由字典到vector进行向量化的时候保存的处理器 4 scaler处理器
 def get_saved_actors_dict_director_dict_vectorizer():
     conn = common.get_connection()
     dict2vec_url = cfg.get_config_property('dict2vec', conn)
@@ -122,6 +127,7 @@ def get_saved_actors_dict_director_dict_vectorizer():
     return actors_dict, director_dict, v_from_pkl, scaler
 
 
+# 把一个dataframe转换成为row为字典形式的list, 每个row是一个字典, 其中包含了所有维度作为key
 def convert_dataframe_2_dict_list(df_main, actors_dict, director_dict):
     data_dict_list = []
     for i in df_main.index:
@@ -169,6 +175,7 @@ def convert_dataframe_2_dict_list(df_main, actors_dict, director_dict):
     return data_dict_list
 
 
+# 更推荐表（recmovie表）中的FM模型打分和LR模型打分
 def update_recmovie_rat(id, rat, connection, model_type):
     rat_field = None
     if model_type == 'LR':
@@ -186,6 +193,7 @@ def update_recmovie_rat(id, rat, connection, model_type):
         connection.close()
 
 
+# 更新recmove表中的FM评分
 def update_fm_rat(df_data, libfm_predict_final):
     conn = common.get_connection()
     index_ = 0
@@ -200,6 +208,7 @@ def update_fm_rat(df_data, libfm_predict_final):
         index_ += 1
 
 
+# 更新recmove表中的LF模型给出的推荐评分
 def update_lr_rat(df_data, lr_predict_final):
     conn = common.get_connection()
     index_ = 0
@@ -208,6 +217,7 @@ def update_lr_rat(df_data, lr_predict_final):
         index_ += 1
 
 
+# 处理任务入口函数
 def process_task():
     _conn = common.get_connection()
     # update_recmovie_rat('1', '1', _conn, 'FM')
@@ -222,6 +232,7 @@ def process_task():
     predict_file_ = cfg.get_config_property('dir_base_url', _conn) + 'X_predict.txt'
 
     # FM PART
+    # 把 X_predict 处理成libsvm格式,供libfm使用
     dump_svmlight_file(scaler.transform(X_predict), np.zeros(X_predict.shape[0]), predict_file_)
     libfm_predict_final = fm(train_file_scaling, predict_file_, classification=False)
     update_fm_rat(df_data, libfm_predict_final)

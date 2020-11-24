@@ -12,7 +12,7 @@ from sklearn.feature_extraction import DictVectorizer
 from sklearn.metrics.pairwise import pairwise_distances
 import json
 
-
+# 获取数据库中,config表的配置项, type为配置项的key, 比如获取csv_last_url,则值为/usr/local/recsys_core/data/comment_origin_data_2019-01-01-01-01-01.csv
 def get_config_property(type_, conn):
     sql = 'select * from config where type = \'%s\'' % type_
     try:
@@ -26,7 +26,7 @@ def get_config_property(type_, conn):
         print(e)
         conn.close()
 
-
+# 与get_config_property对应, 为设置配置项函数
 def set_config_property(content, type_, conn):
     sql = 'update config set content = \'%s\' where type = \'%s\'' % (content, type_)
     try:
@@ -37,7 +37,7 @@ def set_config_property(content, type_, conn):
         print(e)
         conn.close()
 
-
+# 测试
 if __name__ == '__main__':
     print(get_config_property('csv_last_url'))
 

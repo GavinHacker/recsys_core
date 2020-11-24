@@ -18,7 +18,7 @@ def enter_(inc, task):
 def task():
     print('test task function')
 
-
+# 定时任务函数
 def schedule_(interval, task_func):
     if interval is None:
         interval=10

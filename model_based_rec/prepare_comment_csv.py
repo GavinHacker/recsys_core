@@ -18,6 +18,7 @@ np.set_printoptions(suppress=True)
 import common.schedule_util as sched_util
 
 
+# 处理mqlog中记录的新的电影评分, 通过sql读取mqlog中类型为c的电影评分动作, 查询出相关的用户\电影\评分信息, 然后追加到训练集的csv上（训练集的csv会变大)
 def process_comment_by_log(process_func):
     connection = common.get_connection()
     sql = 'select * from mqlog where logtype = \'c\' and pulled = 0 limit 0, 1000'
@@ -45,6 +46,7 @@ def process_comment_by_log(process_func):
             print('No new available comment')
             return
         process_func(comment_id_list, movie_id_list, user_id_list, connection)
+        # 把mqlog表的pulled表标记为1, 即处理过此消息,不再二次处理
         with connection.cursor() as cursor4update:
             for id_ in message_id_list:
                 update_sql = 'update mqlog set pulled=1 where id=\'%s\'' % id_
@@ -56,6 +58,7 @@ def process_comment_by_log(process_func):
     connection.close()
 
 
+# 处理新的电影评分的具体处理函数,作为回调函数被传递使用
 def process_new_comment_collection(comment_list, movie_list, user_list, conn):
     exp_comment = '(\'' + reduce(lambda x, y: x+'\',\''+y, comment_list) + '\')'
     c_sql = 'select * from comment_new where id in ' + exp_comment
@@ -79,6 +82,7 @@ def process_new_comment_collection(comment_list, movie_list, user_list, conn):
     cfg.set_config_property(new_csv_url, 'csv_last_url', conn)
 
 
+# 定时任务处理入口函数
 def process_task():
     start_time = datetime.datetime.now()
     print('start process comment csv task:'+str(datetime.datetime.now()))
