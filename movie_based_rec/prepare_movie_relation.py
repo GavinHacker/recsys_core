@@ -12,6 +12,7 @@ np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 import json
 import common.schedule_util as sched_util
+from util.log_util import logger4prepare_movie_relation as logger
 
 
 # 从数据库中获取全量的电影数据
@@ -42,7 +43,7 @@ def get_dim_dict(df, dim_name):
     return type_dict
 
 
-# 获取各个频率统计字典对象
+# 获取必要的频率统计数据
 def get_typedict_actorsdict_directordict_traitdict():
     _, df = get_movie_data()
     type_dict = get_dim_dict(df, 'type')
@@ -82,7 +83,7 @@ def convert_to_dict_list(df_):
     return movie_dict_list
 
 
-# 分别获取相似矩阵, 字典 -> 向量 转换器, 矩阵向量
+# 分别获取相似矩阵, 字典2向量转换器, 矩阵向量
 def get_0similarity_matrix_1dict_vectorizer_2vector_matrix(movie_dict_list):
     v = DictVectorizer()
     X = v.fit_transform(movie_dict_list)
@@ -100,16 +101,16 @@ def test_similarity_matrix(item_similarity_matrix, movie_dict_list, vector_matri
             _max = i
             _max_index = index
         index += 1
-    print(_max_index, _max)
+    logger.info(str((_max_index, _max)))
     index_of_sim = _max_index
 
-    print(original_df.iloc[index_of_sim])
-    print(movie_dict_list[index_of_sim])
+    logger.info(original_df.iloc[index_of_sim])
+    logger.info(movie_dict_list[index_of_sim])
     df_106 = pd.DataFrame(data=vector_matrix.todense()[index_of_sim], columns=dict_vectorizer.feature_names_)
     df_0 = pd.DataFrame(data=vector_matrix.todense()[compare_index], columns=dict_vectorizer.feature_names_)
     df_diff = pd.concat([df_0, df_106], axis=0, ignore_index=True)
     df_diff = df_diff.T
-    print(df_diff[(df_diff[0] != 0) | (df_diff[1] != 0)])
+    logger.info(df_diff[(df_diff[0] != 0) | (df_diff[1] != 0)])
 
 
 # 插入一个movie based数据
@@ -127,26 +128,26 @@ def insert_one_ibmovie(id_,
             cursor.execute(exist_sql)
             r = cursor.fetchone()
             if r is not None and r[0] > 1:
-                print('exist ibmovie data, movieid:' + movieid + " recmovieid:" + recmovieid)
+                logger.info('exist ibmovie data, movieid:' + movieid + " recmovieid:" + recmovieid)
                 return
     except Exception as e:
-        print('exception:' + str(e))
+        logger.warn('exception:' + str(e))
         try:
             connection.close()
         except Exception as e:
-            print(e)
+            logger.warn(e)
             pass
-    print('insert one recmovie, movieid:' + movieid + "recmovieid:" + recmovieid)
+    logger.info('insert one recmovie, movieid:' + movieid + "recmovieid:" + recmovieid)
     sql = 'insert into ibmovie (id, movieid, recmovieid, recmovierat, simrat, time, enable) values (\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\',\'%s\')' % (id_, movieid, recmovieid, recmovierat, simrat, time, enable)
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql)
     except Exception as e:
-        print('exception:' + str(e))
+        logger.warn('exception:' + str(e))
         try:
             connection.close()
         except Exception as e:
-            print(e)
+            logger.warn(e)
             pass
 
 
@@ -160,13 +161,13 @@ def get_recmovie_cnt_by_movieid(movieid, connection):
                 return 0
             return cursor.fetchone()[0]
     except Exception as e:
-        print('exception@get_recmovie_by_movieid:' + str(e))
+        logger.warn('exception@get_recmovie_by_movieid:' + str(e))
         try:
             connection.cursor().close()
             connection.close()
-            print('closed')
+            logger.info('closed')
         except Exception as e1:
-            print('exception1@get_recmovie_by_movieid:' + str(e1))
+            logger.warn('exception1@get_recmovie_by_movieid:' + str(e1))
         connection = common.get_connection()
 
 
@@ -181,9 +182,9 @@ def process_offline_compute_by_cosdis(rec_per_num, item_similarity, df_sim, df_o
         movie_id = df_orgin.iloc[i]['id']
         recmovie_cnt = get_recmovie_cnt_by_movieid(movie_id, connection)
         if recmovie_cnt == 200:
-            print('pass...')
+            logger.info('pass...')
             continue
-        print('new...')
+        logger.info('new...')
         time_now = datetime.datetime.now()
         for rec_movie_item in df_sim_p.to_dict().items():
             if rec_movie_item[0] != i:
@@ -210,14 +211,14 @@ def process_by_movie_change_log(process_func, sim_matrix, df_origin):
                 break
             message = json.loads(r[2])
             movieid = message['movieid']
-            print('process movie\'s id is:' + movieid)
+            logger.info('process movie\'s id is:' + movieid)
             process_func(movieid, sim_matrix, df_origin)
             with connection.cursor() as cursor4update:
                 update_sql = 'update mqlog set pulled=1 where id=\'%s\'' % r[0]
                 cursor4update.execute(update_sql)
         connection.commit()
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
     connection.close()
 
@@ -234,7 +235,7 @@ def get_min_sim_movie_by_movieid(movieid):
             return None
         return r
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
     connection.close()
 
@@ -242,12 +243,12 @@ def get_min_sim_movie_by_movieid(movieid):
 # 处理每一个增量的电影, 在相似度矩阵中查找到关于新电影 的相似电影集合, 插入到ibmoive中
 def process_per_movie(movieid, sim_matrix, df_origin, rec_per_num=201):
     df_sim_matrix = pd.DataFrame(data=sim_matrix)
-    print(df_sim_matrix.shape)
+    logger.info(df_sim_matrix.shape)
     connection = common.get_connection()
     time_now = datetime.datetime.now()
     for i in range(0, sim_matrix.shape[0]):
         if df_origin.iloc[i]['id'] == movieid:
-            print(df_origin.iloc[i])
+            logger.info(df_origin.iloc[i])
             df_sim_p_self = df_sim_matrix.nsmallest(rec_per_num, i)
             df_sim_p_self = df_sim_p_self[i]
             for rec_movie_item in df_sim_p_self.to_dict().items():
@@ -271,10 +272,10 @@ def process_per_movie(movieid, sim_matrix, df_origin, rec_per_num=201):
                     sim_movie_rat = df_origin.iloc[sim_movie_index]['rat']
 
                     min_sim_movie4self = get_min_sim_movie_by_movieid(sime_movie_id)
-                    print(min_sim_movie4self)
-                    print(sim_movie_dis)
+                    logger.info(min_sim_movie4self)
+                    logger.info(sim_movie_dis)
                     if sim_movie_dis < min_sim_movie4self[2]:
-                        print('insert as recmovie...')
+                        logger.info('insert as recmovie...')
                         insert_one_ibmovie(id_=uuid.uuid4(), movieid=sime_movie_id, recmovieid=movieid,
                                            recmovierat=sim_movie_rat, simrat=sim_movie_dis, time=time_now, enable='1',
                                            connection=connection)
@@ -282,7 +283,7 @@ def process_per_movie(movieid, sim_matrix, df_origin, rec_per_num=201):
 
 # 处理主函数
 def process_task():
-    print('start process movie similarity task:'+str(datetime.datetime.now()))
+    logger.info('start process movie similarity task:'+str(datetime.datetime.now()))
     start_time = datetime.datetime.now()
     df_origin, df_simple = get_movie_data()
     movie_dict_list = convert_to_dict_list(df_simple)
@@ -291,8 +292,8 @@ def process_task():
     # 处理mqlog的消息日志, 如果出现新的电影, 则执行相似电影的计算插入到ibmoive表中
     process_by_movie_change_log(process_per_movie, similarity_matrix, df_origin)
     end_time = datetime.datetime.now()
-    print(end_time - start_time)
-    print('finish process movie similarity task:' + str(datetime.datetime.now()))
+    logger.info(end_time - start_time)
+    logger.info('finish process movie similarity task:' + str(datetime.datetime.now()))
 
 
 if __name__ == '__main__':

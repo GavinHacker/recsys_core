@@ -16,6 +16,7 @@ import common.config as cfg
 np.set_printoptions(precision=3)
 np.set_printoptions(suppress=True)
 import common.schedule_util as sched_util
+from util.log_util import logger4prepare_comment_csv as logger
 
 
 # 处理mqlog中记录的新的电影评分, 通过sql读取mqlog中类型为c的电影评分动作, 查询出相关的用户\电影\评分信息, 然后追加到训练集的csv上（训练集的csv会变大)
@@ -41,9 +42,9 @@ def process_comment_by_log(process_func):
                 user_id = message['userid']
                 user_id_list.append(user_id)
                 message_id_list.append(r[0])
-        print('process comment\'s id collection is:' + str(comment_id_list))
+        logger.info('process comment\'s id collection is:' + str(comment_id_list))
         if len(comment_id_list) == 0 or len(movie_id_list) == 0 or len(user_id_list) == 0:
-            print('No new available comment')
+            logger.info('No new available comment')
             return
         process_func(comment_id_list, movie_id_list, user_id_list, connection)
         # 把mqlog表的pulled表标记为1, 即处理过此消息,不再二次处理
@@ -53,7 +54,7 @@ def process_comment_by_log(process_func):
                 cursor4update.execute(update_sql)
         connection.commit()
     except Exception as e:
-        print(e)
+        logger.info(e)
         connection.close()
     connection.close()
 
@@ -62,13 +63,13 @@ def process_comment_by_log(process_func):
 def process_new_comment_collection(comment_list, movie_list, user_list, conn):
     exp_comment = '(\'' + reduce(lambda x, y: x+'\',\''+y, comment_list) + '\')'
     c_sql = 'select * from comment_new where id in ' + exp_comment
-    print(c_sql)
+    logger.info(c_sql)
     exp_movie = '(\'' + reduce(lambda x, y: x+'\',\''+y, movie_list) + '\')'
     m_sql = 'select * from movie where id in ' + exp_movie
-    print(m_sql)
+    logger.info(m_sql)
     exp_user = '(\'' + reduce(lambda x, y: x+'\',\''+y, user_list) + '\')'
     u_sql = "select * from userproex_new where userid in " + exp_user
-    print(u_sql)
+    logger.info(u_sql)
     df_incremental = pd.read_sql_query(c_sql, conn)
     df_movie = pd.read_sql_query(m_sql, conn)
     df_user_pro = pd.read_sql_query(u_sql, conn)
@@ -85,13 +86,13 @@ def process_new_comment_collection(comment_list, movie_list, user_list, conn):
 # 定时任务处理入口函数
 def process_task():
     start_time = datetime.datetime.now()
-    print('start process comment csv task:'+str(datetime.datetime.now()))
+    logger.info('start process comment csv task:'+str(datetime.datetime.now()))
 
     process_comment_by_log(process_new_comment_collection)
 
     end_time = datetime.datetime.now()
-    print(end_time - start_time)
-    print('finish process comment csv task:' + str(datetime.datetime.now()))
+    logger.info(end_time - start_time)
+    logger.info('finish process comment csv task:' + str(datetime.datetime.now()))
 
 
 if __name__ == '__main__':

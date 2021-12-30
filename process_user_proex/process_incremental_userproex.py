@@ -5,6 +5,7 @@ import datetime
 import json
 import common.schedule_util as sched_util
 import math
+from util.log_util import logger4process_userproex as logger
 
 
 # 全量处理userproex, 处理中位数字段
@@ -31,14 +32,14 @@ def get_user_list_in_comment(is_all_or_sample, process_func, insert_or_update_fu
                 process_size = 0
         connection.commit()
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
     connection.close()
 
 
 # 插入或更新一条userproex数据
 def insert_or_update_one_userproex(userid, rmax, rmin, ravg, rmedium, rcount, rsum):
-    print('insert_or_update_one_userproex start')
+    logger.info('insert_or_update_one_userproex start')
     is_insert = True
     connection = common.get_connection()
     try:
@@ -50,7 +51,7 @@ def insert_or_update_one_userproex(userid, rmax, rmin, ravg, rmedium, rcount, rs
         if res_cnt > 0:
             is_insert = False
     except Exception as e:
-        print('query for exist info error'+str(e))
+        logger.warn('query for exist info error'+str(e))
 
     if is_insert:
         sql = 'insert into userproex_new(userid, rmax, rmin, ravg, rcount, rsum, rmedian) values(\'%s\', %s, %s, %s, %s, %s, %s)' % (userid, rmax, rmin, ravg, rcount, rsum, rmedium)
@@ -61,16 +62,16 @@ def insert_or_update_one_userproex(userid, rmax, rmin, ravg, rmedium, rcount, rs
         with connection.cursor() as cursor:
             cursor.execute(sql)
         connection.commit()
-        print(('insert userid:' if is_insert else 'update userid:') + str(userid) + ' success.')
+        logger.info(('insert userid:' if is_insert else 'update userid:') + str(userid) + ' success.')
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
     connection.close()
 
 
 # 更新userproex数据的median字段
 def update_one_userproex_4_median(userid, rmedian, connection):
-    print('insert_or_update_one_userproex_4_median start')
+    logger.info('insert_or_update_one_userproex_4_median start')
     not_exist = True
     try:
         sql = 'select count(*) from userproex_new where userid=\'%s\'' % userid
@@ -80,11 +81,11 @@ def update_one_userproex_4_median(userid, rmedian, connection):
         if res_cnt > 0:
             not_exist = False
     except Exception as e:
-        print('query for exist info error'+str(e))
+        logger.warn('query for exist info error'+str(e))
 
     # 函数的调用场景或数据异常
     if not_exist:
-        print('异常数据'+str(userid))
+        logger.info('异常数据'+str(userid))
         return
     else:
         sql = 'update userproex_new set rmedian=%s where userid=\'%s\'' % (rmedian, userid)
@@ -92,9 +93,9 @@ def update_one_userproex_4_median(userid, rmedian, connection):
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql)
-        print('update userproex median (userid:' + str(userid) + ') success.')
+        logger.info('update userproex median (userid:' + str(userid) + ') success.')
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
 
 
@@ -116,7 +117,7 @@ def process_per_user(userid, insert_or_update_func):
         rlist = cursor.fetchall()
         rmedian = np.median(np.array(list(map(lambda x:x[0], rlist))).astype(float))
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
 
     sql = 'select max(rating) as rmax, min(rating) as rmin, avg(rating) as ravg, count(rating) as rcount, sum(rating) as rsum from comment_new where userid=\'%s\'' % userid
@@ -128,7 +129,7 @@ def process_per_user(userid, insert_or_update_func):
             r = cursor.fetchone()
             rmax, rmin, ravg, rcount, rsum = r[0], r[1], r[2], r[3], r[4]
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
 
     if rmax is None:
@@ -158,7 +159,7 @@ def process_per_user_median(userid, insert_or_update_func, connection):
         rlist = cursor.fetchall()
         rmedian = np.median(np.array(list(map(lambda x:x[0], rlist))).astype(float))
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
     if math.isnan(rmedian):
         rmedian = 0
@@ -178,28 +179,28 @@ def get_user_list_in_log(process_func, insert_or_update_func):
                 break
             message = json.loads(r[2])
             userid = message['userid']
-            print('process user\'s id is:' + userid)
+            logger.info('process user\'s id is:' + userid)
             process_func(userid, insert_or_update_func)
             with connection.cursor() as cursor4update:
                 update_sql = 'update mqlog set pulled=1 where id=\'%s\'' % r[0]
                 cursor4update.execute(update_sql)
         connection.commit()
     except Exception as e:
-        print(e)
+        logger.warn(e)
         connection.close()
     connection.close()
 
 
 def process_task():
-    print('start process userproex task:'+str(datetime.datetime.now()))
+    logger.info('start process userproex task:'+str(datetime.datetime.now()))
     start_time = datetime.datetime.now()
 
     # get_user_list_in_comment(True, process_per_user_median, update_one_userproex_4_median)
     get_user_list_in_log(process_per_user, insert_or_update_one_userproex)
 
     end_time = datetime.datetime.now()
-    print(end_time - start_time)
-    print('finish process userproex task:' + str(datetime.datetime.now()))
+    logger.info(end_time - start_time)
+    logger.info('finish process userproex task:' + str(datetime.datetime.now()))
 
 
 if __name__ == '__main__':

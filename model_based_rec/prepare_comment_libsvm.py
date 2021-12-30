@@ -19,6 +19,7 @@ from sklearn import preprocessing
 import common.config as cfg
 import common.common as common
 import common.schedule_util as sched_util
+from util.log_util import logger4prepare_comment_libsvm as logger
 
 
 # 获取已经处理好的最新的CSV
@@ -42,7 +43,7 @@ def load_main_df_from_csv():
         try:
             return datetime.datetime.strptime(t, '%Y-%m-%d %H:%M:%S').year - 2000
         except Exception as e:
-            print(e)
+            logger.warn(e)
 
     df_main['TIME_DIS'] = df_main['TIME'].apply(lambda x: process_time(x))
     df_main = df_main.drop(['TIME'], axis=1)
@@ -89,7 +90,7 @@ def get_dict_list(df_main, actors_dict, director_dict):
     data_dict_list = []
     for i in df_main.index:
         if i % 1000 == 0:
-            print('.')
+            logger.info('process 1000 comment')
         _dict = {}
         is_invalid = False
         # type
@@ -98,7 +99,7 @@ def get_dict_list(df_main, actors_dict, director_dict):
         # actors
         for s_actor in df_main.iloc[i]['actors'].split('|'):
             if not s_actor in actors_dict:
-                print('invalid data index is ' + str(i))
+                logger.info('invalid data index is ' + str(i))
                 invalid_data_list.append(i)
                 is_invalid = True
                 break
@@ -132,8 +133,8 @@ def get_dict_list(df_main, actors_dict, director_dict):
         for s_trait in df_main.iloc[i]['trait'].split('|'):
             _dict[s_trait] = 1
         data_dict_list.append(_dict)
-    print(invalid_data_list)
-    print(len(data_dict_list))
+    logger.info(invalid_data_list)
+    logger.info(len(data_dict_list))
     return data_dict_list
 
 csv_url_cache = None
@@ -143,14 +144,14 @@ csv_url_cache = None
 def process_task():
     global csv_url_cache
     start_time = datetime.datetime.now()
-    print('start process comment to libsvm task:'+str(datetime.datetime.now()))
+    logger.info('start process comment to libsvm task:'+str(datetime.datetime.now()))
 
     conn = common.get_connection()
     csv_url = cfg.get_config_property('csv_last_url', conn)
     if csv_url_cache is None:
         csv_url_cache = csv_url
     elif csv_url_cache == csv_url:
-        print('there is no new comment csv...')
+        logger.info('there is no new comment csv...')
         return
     # 从csv文件加载数据集
     data_frame_main = load_main_df_from_csv()
@@ -178,7 +179,7 @@ def process_task():
     test_X_ = train_X[280000:]
     test_y_ = train_y[280000:]
 
-    print(train_X_.shape)
+    logger.info(train_X_.shape)
 
     # 对于逻辑回归的训练集和测试集数据处理, 评分大于3为用户喜爱电影
     train_y_lr_ = train_y_.apply(lambda x: 1 if int(x) > 3 else 0)
@@ -226,8 +227,8 @@ def process_task():
         pkl.dump(scaler, f)
 
     end_time = datetime.datetime.now()
-    print(end_time - start_time)
-    print('finish process comment to libsvm task:' + str(datetime.datetime.now()))
+    logger.info(end_time - start_time)
+    logger.info('finish process comment to libsvm task:' + str(datetime.datetime.now()))
 
 
 if __name__ == '__main__':

@@ -26,6 +26,7 @@ import os
 import common.config as cfg
 import common.common as common
 import common.schedule_util as sched_util
+from util.log_util import logger4model_based_fm_lr_rec as logger
 
 
 # 使用命令行运行FM模型调用
@@ -43,7 +44,7 @@ def run(cmd):
                              stderr=fileno, universal_newlines=True)
         p.wait(1000000000000)
         out_temp.seek(0)
-        print(out_temp.read().decode('utf8', 'replace'))
+        logger.info(out_temp.read().decode('utf8', 'replace'))
     except Exception as e:
         raise RuntimeError('run error: %s' % str(e))
     finally:
@@ -59,17 +60,16 @@ def fm(train_file, test_file, classification=True, rank=10, n_iter=150):
     cmd_ = '%s -task %s -method mcmc -train %s -test %s -iter %s -dim \'1,1,%s\' -out %soutput_.libfm' % (libfm, task, train_file, test_file, n_iter, rank, base_dir)
     #console_output = !$LIBFM_PATH -task $task -method als -regular '0,0,10' -train $train_file -test $test_file -iter $n_iter -dim '1,1,$rank' -save_model recsysmode.fm -out output_.libfm
     #console_output = !$LIBFM_PATH -task $task -method sgd -train $train_file -test $test_file -iter $n_iter -dim '1,1,$rank' -save_model recsysmode.fm -out output_.libfm
-    print(libfm)
+    logger.info(libfm)
     console_output = run(cmd_)
-    print(console_output)
+    logger.info(console_output)
     libfm_predict = pd.read_csv('%soutput_.libfm' % base_dir, header=None).values.flatten()
+    conn.close()
     return libfm_predict
 
 
-# 测试FM
 def test_fm_by_test_data(train_file, test_file):
 
-    conn = common.get_connection()
     libfm_predict = fm(train_file, test_file, classification=False)
 
     libfm_predict_series = pd.Series(libfm_predict)
@@ -77,8 +77,8 @@ def test_fm_by_test_data(train_file, test_file):
 
     _, y = get_data(test_file)
 
-    print('MSE(to int):' + str(mean_squared_error(y, libfm_predict_series_int.tolist())))
-    print('MSE(origin):' + str(mean_squared_error(y, libfm_predict_series.tolist())))
+    logger.info('MSE(to int):' + str(mean_squared_error(y, libfm_predict_series_int.tolist())))
+    logger.info('MSE(origin):' + str(mean_squared_error(y, libfm_predict_series.tolist())))
 
 
 # 从路径中获取libsvm数据, 返回X矩阵和 y矩阵
@@ -92,15 +92,16 @@ def get_recmovie_by_movie_based():
     conn = common.get_connection()
     sql = 'select * from recmovie left join movie on movie.id=recmovie.movieid left join userproex_new on userproex_new.userid=recmovie.userid'
     df_data = pd.read_sql_query(sql, conn)
-    #df_data = df_data.drop([0], axis=1)
-    #df_data = df_data.rename(columns = {'userid':'USERID'})
-    #df_data['USERID'].fillna(0)
-    print(df_data.columns)
+    # df_data = df_data.drop([0], axis=1)
+    # df_data = df_data.rename(columns = {'userid':'USERID'})
+    # df_data['USERID'].fillna(0)
+    logger.info(df_data.columns)
     df_data = df_data.loc[:,~df_data.columns.duplicated()]
-    #print(df_data.shape)
+    # print(df_data.shape)
     df_data = df_data.rename(columns = {'userid':'USERID'})
     df_data['TIME_DIS'] = np.zeros(df_data.shape[0])
     df_data = df_data.fillna(0)
+    conn.close()
     return df_data
 
 
@@ -123,7 +124,7 @@ def get_saved_actors_dict_director_dict_vectorizer():
 
     with open(scaler_url, 'rb') as f:
         scaler = pkl.load(f)
-
+    conn.close()
     return actors_dict, director_dict, v_from_pkl, scaler
 
 
@@ -139,7 +140,7 @@ def convert_dataframe_2_dict_list(df_main, actors_dict, director_dict):
         # actors
         for s_actor in df_main.iloc[i]['actors'].split('|'):
             if not s_actor in actors_dict:
-                print('invalid data index is ' + str(i))
+                logger.info('invalid data index is ' + str(i))
                 is_invalid = True
                 break
             if actors_dict[s_actor] < 2:
@@ -184,13 +185,15 @@ def update_recmovie_rat(id, rat, connection, model_type):
         rat_field = 'recmovie.fmrat'
 
     sql = 'update recmovie set %s = %s,rectime=\'%s\' where id = \'%s\'' % (rat_field, rat, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), id)
-    print(sql)
+    logger.info(sql)
     try:
         with connection.cursor() as cursor:
             cursor.execute(sql)
         connection.commit()
-    except:
-        connection.close()
+    except Exception as e:
+        # connection.close()
+        logger.info('error sql:' + sql)
+        logger.warn(e)
 
 
 # 更新recmove表中的FM评分
@@ -206,6 +209,7 @@ def update_fm_rat(df_data, libfm_predict_final):
             print(e)
         update_recmovie_rat(df_data.iloc[index_]['id'], r_temp, conn, 'FM')
         index_ += 1
+    conn.close()
 
 
 # 更新recmove表中的LF模型给出的推荐评分
@@ -215,10 +219,13 @@ def update_lr_rat(df_data, lr_predict_final):
     for r in lr_predict_final:
         update_recmovie_rat(df_data.iloc[index_]['id'], r[1], conn, 'LR')
         index_ += 1
+    conn.close()
 
 
 # 处理任务入口函数
 def process_task():
+    start_time = datetime.datetime.now()
+    logger.info('start process fm,lr rec task:' + str(datetime.datetime.now()))
     _conn = common.get_connection()
     # update_recmovie_rat('1', '1', _conn, 'FM')
     # os._exit(0)
@@ -243,7 +250,7 @@ def process_task():
 
     train_X_lr, train_y = get_data(train_file_lr_path)
     # test_X_lr, test_y = get_data(test_file_lr_path)
-    print(train_X_lr.shape)
+    logger.info(train_X_lr.shape)
 
     lr = LogisticRegression(C=0.1, penalty='l2')
     lr.fit(train_X_lr, train_y)
@@ -269,8 +276,13 @@ def process_task():
 
     lr_predict_final = lr.predict_proba(X_predict)
     update_lr_rat(df_data, lr_predict_final.tolist())
-    print(lr.classes_)
+    logger.info(lr.classes_)
+    _conn.close()
+    end_time = datetime.datetime.now()
+    logger.info(end_time - start_time)
+    logger.info('finish process fm,lr rec task:' + str(datetime.datetime.now()))
 
 
 if __name__ == '__main__':
     sched_util.schedule_(10*60*1000, task_func=process_task)
+
